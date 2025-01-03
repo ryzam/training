@@ -67,6 +67,8 @@ kubectl -n cattle-system rollout status deploy/rancher
 - You might need to add a host entry (`127.0.0.1 rancher.localhost`) in your system's `/etc/hosts` file for the domain to resolve.
 - Log in to Rancher. It will prompt you to set a password during the first login.
 
+![image](https://github.com/user-attachments/assets/56ff8534-964c-4a57-9b1c-73491784e156)
+
 ---
 
 ### **Managing K3d Cluster with Rancher**
