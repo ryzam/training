@@ -69,6 +69,9 @@ kubectl -n cattle-system rollout status deploy/rancher
 
 ![image](https://github.com/user-attachments/assets/56ff8534-964c-4a57-9b1c-73491784e156)
 
+![image](https://github.com/user-attachments/assets/d1188687-d7b2-4b78-9f34-a719b0e5abee)
+
+
 ---
 
 ### **Managing K3d Cluster with Rancher**
