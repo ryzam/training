@@ -52,10 +52,7 @@ kubectl get pods -n cert-manager
 
 Install Rancher using Helm:
 ```bash
-helm install rancher rancher-latest/rancher \
-  --namespace cattle-system \
-  --set hostname=rancher.localhost \
-  --set replicas=1
+helm install rancher rancher-latest/rancher --namespace cattle-system --set hostname=rancher.localhost --set replicas=1
 ```
 
 - `hostname=rancher.localhost`: The hostname for Rancher. You can replace it with your custom domain.
