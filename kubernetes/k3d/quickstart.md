@@ -16,6 +16,10 @@ Using Rancher with a K3d (K3s in Docker) cluster is a straightforward way to tes
 ```bash
 k3d cluster create mycluster --agents 2 --port "8080:80@loadbalancer" --port "8443:443@loadbalancer"
 ```
+or
+```bash
+k3d cluster create rancher --api-port 6550 --servers 1 --agents 1 --k3s-arg "--disable=traefik@server:0" --port "80:80@loadbalancer" --port "443:443@loadbalancer" --api-port 0.0.0.0:6550 --wait
+```
 - `mycluster`: The name of your cluster.
 - `--agents 2`: Creates 2 worker nodes.
 - `--port`: Exposes ports for the Rancher UI (default: 80 and 443).
