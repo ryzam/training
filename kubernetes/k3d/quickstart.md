@@ -28,6 +28,10 @@ Verify the cluster:
 ```bash
 kubectl cluster-info
 ```
+Create nginx-ingress
+```bash
+helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx --namespace ingress-nginx --create-namespace
+```
 
 #### **2. Install Rancher**
 Rancher can be installed using Helm. First, add the Rancher Helm repository:
