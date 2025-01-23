@@ -66,6 +66,35 @@ Verify Rancher deployment:
 ```bash
 kubectl -n cattle-system rollout status deploy/rancher
 ```
+If k3d running on nginx ingress, change rancher services from ClusterIP to NodePort
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: rancher
+  namespace: cattle-system
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30443
+      protocol: TCP
+      name: http
+    - port: 8443
+      targetPort: 443
+      nodePort: 30444
+      protocol: TCP
+      name: https
+  selector:
+    app: rancher
+```
+To view nginx ingress pod controller
+
+```bash
+kubectl get pod -n cattle-system
+```
 
 #### **3. Access Rancher**
 - Open `https://localhost:8443` in your browser.
