@@ -35,6 +35,155 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
        server master2 <MASTER2_IP>:6443 check
    ```
 
+Here's how you can set up **HAProxy** on a dedicated node to load balance traffic across your RKE2 master nodes:
+
+---
+
+## **Step 1: Prepare the New Node**
+1. **System Requirements**:
+   - At least 1 CPU, 512MB RAM, and 10GB disk space.
+   - Ensure the node has network access to the RKE2 master nodes.
+
+2. **Install Prerequisites**:
+   - Update the package list and install required tools:
+     ```bash
+     sudo apt update && sudo apt install -y curl vim
+     ```
+
+3. **Ensure Network Access**:
+   - Verify the HAProxy node can reach all master nodes on port `6443`:
+     ```bash
+     curl -k https://<MASTER_NODE_IP>:6443
+     ```
+     Replace `<MASTER_NODE_IP>` with your RKE2 master nodes' IPs.
+
+---
+
+## **Step 2: Install HAProxy**
+1. Install HAProxy using the package manager:
+   ```bash
+   sudo apt update && sudo apt install -y haproxy
+   ```
+
+2. Verify the installation:
+   ```bash
+   haproxy -v
+   ```
+   Example output: `HA-Proxy version 2.x.x`
+
+---
+
+## **Step 3: Configure HAProxy**
+1. Backup the default configuration:
+   ```bash
+   sudo cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+   ```
+
+2. Edit the configuration file:
+   ```bash
+   sudo vim /etc/haproxy/haproxy.cfg
+   ```
+
+3. Replace the contents of the file with the following configuration:
+   ```haproxy
+   global
+       log /dev/log    local0
+       log /dev/log    local1 notice
+       chroot /var/lib/haproxy
+       stats socket /run/haproxy/admin.sock mode 660 level admin
+       stats timeout 30s
+       user haproxy
+       group haproxy
+       daemon
+
+   defaults
+       log     global
+       option  tcplog
+       option  dontlognull
+       timeout connect 5000ms
+       timeout client  50000ms
+       timeout server  50000ms
+       errorfile 400 /etc/haproxy/errors/400.http
+       errorfile 403 /etc/haproxy/errors/403.http
+       errorfile 408 /etc/haproxy/errors/408.http
+       errorfile 500 /etc/haproxy/errors/500.http
+       errorfile 502 /etc/haproxy/errors/502.http
+       errorfile 503 /etc/haproxy/errors/503.http
+       errorfile 504 /etc/haproxy/errors/504.http
+
+   frontend kubernetes_api
+       bind *:6443
+       mode tcp
+       option tcplog
+       default_backend kubernetes_masters
+
+   backend kubernetes_masters
+       mode tcp
+       balance roundrobin
+       option tcp-check
+       server master1 <MASTER1_IP>:6443 check
+       server master2 <MASTER2_IP>:6443 check
+   ```
+   - Replace `<MASTER1_IP>` and `<MASTER2_IP>` with the IPs of your master nodes.
+   - The `bind *:6443` ensures HAProxy listens on port 6443 for incoming traffic.
+
+4. Test the configuration:
+   ```bash
+   sudo haproxy -f /etc/haproxy/haproxy.cfg -c
+   ```
+   If the configuration is valid, it will display `Configuration file is valid`.
+
+---
+
+## **Step 4: Start and Enable HAProxy**
+1. Restart the HAProxy service to apply changes:
+   ```bash
+   sudo systemctl restart haproxy
+   ```
+
+2. Enable HAProxy to start on boot:
+   ```bash
+   sudo systemctl enable haproxy
+   ```
+
+3. Verify HAProxy is running:
+   ```bash
+   sudo systemctl status haproxy
+   ```
+
+---
+
+## **Step 5: Test HAProxy**
+1. On another machine, test the load balancer:
+   ```bash
+   curl -k https://<HA_PROXY_NODE_IP>:6443
+   ```
+   Replace `<HA_PROXY_NODE_IP>` with the IP of your HAProxy node. You should get a Kubernetes API response.
+
+2. To test failover, temporarily stop one master node:
+   ```bash
+   sudo systemctl stop rke2-server
+   ```
+   Then try the API request again. HAProxy should route traffic to the other master node.
+
+---
+
+## **Optional: Monitor HAProxy**
+1. Enable HAProxy stats (for monitoring):
+   Add the following section to `/etc/haproxy/haproxy.cfg`:
+   ```haproxy
+   listen stats
+       bind *:8404
+       stats enable
+       stats uri /stats
+       stats refresh 10s
+   ```
+2. Restart HAProxy:
+   ```bash
+   sudo systemctl restart haproxy
+   ```
+3. Access the stats page at `http://<HA_PROXY_NODE_IP>:8404/stats`.
+
 ---
 
 ## **2. Install RKE2**
