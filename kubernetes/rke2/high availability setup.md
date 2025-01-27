@@ -1,4 +1,4 @@
-To set up a highly available (HA) RKE2 cluster with **2 master nodes** and **3 worker nodes**, and install Rancher server management inside the cluster, follow these steps:
+To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 worker nodes**, and install Rancher server management inside the cluster, follow these steps:
 
 ---
 
