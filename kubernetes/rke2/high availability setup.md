@@ -73,6 +73,11 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
 6. View status
    - sudo systemctl status rke2-server.service
    - sudo journalctl -u rke2-server.service -f
+  
+7. Copy server node-token
+   ```bash
+   sudo cat /var/lib/rancher/rke2/server/node-token
+   ```
      
 ### **On All Worker Nodes**
 1. Install RKE2:
