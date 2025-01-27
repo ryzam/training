@@ -42,10 +42,12 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
    ```bash
    curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=server sudo sh -
    ```
+
 2. Enable RKE2 server:
    ```bash
    sudo systemctl enable rke2-server.service
    ```
+
 3. Configure RKE2 for HA:
    - sudo mkdir -p /etc/rancher/rke2
    - sudo nano /etc/rancher/rke2/config.yaml
@@ -57,6 +59,13 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
        - "<LOAD_BALANCER_IP>"
      ```
    - Replace `<LOAD_BALANCER_IP>` with your load balancer's IP and `<CLUSTER_SECRET_TOKEN>` with a strong, unique token.
+
+4. kubeconfig file will be written to /etc/rancher/rke2/rke2.yaml. We need to copy into .kube/config
+   ```bash
+   mkdir .kube
+   cp /etc/rancher/rke2/rke2.yaml .kube/config
+   ```
+
 5. Start RKE2 server:
    ```bash
    sudo systemctl start rke2-server.service
