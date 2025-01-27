@@ -41,13 +41,15 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
 ### **On All Master Nodes**
 1. Install RKE2:
    ```bash
-   curl -sfL https://get.rke2.io | sh -
+   curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=server sudo sh -
    ```
 2. Enable RKE2 server:
    ```bash
    sudo systemctl enable rke2-server.service
    ```
 3. Configure RKE2 for HA:
+   - sudo mkdir -p /etc/rancher/rke2
+   - sudo nano /etc/rancher/rke2/config.yaml
    - Edit `/etc/rancher/rke2/config.yaml` on **master nodes**:
      ```yaml
      server: https://<LOAD_BALANCER_IP>:6443
@@ -56,32 +58,39 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
        - "<LOAD_BALANCER_IP>"
      ```
    - Replace `<LOAD_BALANCER_IP>` with your load balancer's IP and `<CLUSTER_SECRET_TOKEN>` with a strong, unique token.
-4. Start RKE2 server:
+5. Start RKE2 server:
    ```bash
    sudo systemctl start rke2-server.service
    ```
-
+6. View status
+   - sudo systemctl status rke2-server.service
+   - sudo journalctl -u rke2-server.service -f
+     
 ### **On All Worker Nodes**
 1. Install RKE2:
    ```bash
-   curl -sfL https://get.rke2.io | sh -
+   curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=agent sh -
    ```
 2. Enable RKE2 agent:
    ```bash
    sudo systemctl enable rke2-agent.service
    ```
 3. Configure the worker nodes:
+   - sudo mkdir -p /etc/rancher/rke2
+   - sudo nano /etc/rancher/rke2/config.yaml
    - Edit `/etc/rancher/rke2/config.yaml`:
      ```yaml
      server: https://<LOAD_BALANCER_IP>:6443
      token: "<CLUSTER_SECRET_TOKEN>"
      ```
    - Use the same `<LOAD_BALANCER_IP>` and `<CLUSTER_SECRET_TOKEN>` as the master nodes.
-4. Start RKE2 agent:
+5. Start RKE2 agent:
    ```bash
    sudo systemctl start rke2-agent.service
    ```
-
+6. View status
+   - sudo systemctl status rke2-agent.service
+   - sudo journalctl -u rke2-agent.service -f
 ---
 
 ## **3. Verify Cluster Setup**
