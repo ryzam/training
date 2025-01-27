@@ -34,6 +34,118 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
        server master1 <MASTER1_IP>:6443 check
        server master2 <MASTER2_IP>:6443 check
    ```
+---
+
+## **2. Install RKE2**
+### **On All Master Nodes**
+1. Install RKE2:
+   ```bash
+   curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=server sudo sh -
+   ```
+2. Enable RKE2 server:
+   ```bash
+   sudo systemctl enable rke2-server.service
+   ```
+3. Configure RKE2 for HA:
+   - sudo mkdir -p /etc/rancher/rke2
+   - sudo nano /etc/rancher/rke2/config.yaml
+   - Edit `/etc/rancher/rke2/config.yaml` on **master nodes**:
+     ```yaml
+     server: https://<LOAD_BALANCER_IP>:6443
+     token: "<CLUSTER_SECRET_TOKEN>"
+     tls-san:
+       - "<LOAD_BALANCER_IP>"
+     ```
+   - Replace `<LOAD_BALANCER_IP>` with your load balancer's IP and `<CLUSTER_SECRET_TOKEN>` with a strong, unique token.
+5. Start RKE2 server:
+   ```bash
+   sudo systemctl start rke2-server.service
+   ```
+6. View status
+   - sudo systemctl status rke2-server.service
+   - sudo journalctl -u rke2-server.service -f
+     
+### **On All Worker Nodes**
+1. Install RKE2:
+   ```bash
+   curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=agent sh -
+   ```
+2. Enable RKE2 agent:
+   ```bash
+   sudo systemctl enable rke2-agent.service
+   ```
+3. Configure the worker nodes:
+   - sudo mkdir -p /etc/rancher/rke2
+   - sudo nano /etc/rancher/rke2/config.yaml
+   - Edit `/etc/rancher/rke2/config.yaml`:
+     ```yaml
+     server: https://<LOAD_BALANCER_IP>:6443
+     token: "<CLUSTER_SECRET_TOKEN>"
+     ```
+   - Use the same `<LOAD_BALANCER_IP>` and `<CLUSTER_SECRET_TOKEN>` as the master nodes.
+5. Start RKE2 agent:
+   ```bash
+   sudo systemctl start rke2-agent.service
+   ```
+6. View status
+   - sudo systemctl status rke2-agent.service
+   - sudo journalctl -u rke2-agent.service -f
+---
+
+## **3. Verify Cluster Setup**
+1. On one master node, verify cluster status:
+   ```bash
+   sudo /var/lib/rancher/rke2/bin/kubectl get nodes
+   ```
+   Ensure all nodes are listed as `Ready`.
+
+2. Save the `kubeconfig` for local access:
+   ```bash
+   mkdir -p ~/.kube
+   sudo cp /etc/rancher/rke2/rke2.yaml ~/.kube/config
+   sudo chown $(id -u):$(id -g) ~/.kube/config
+   ```
+
+---
+
+## **4. Install Rancher Server**
+1. Add the Helm repository:
+   ```bash
+   helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
+   helm repo update
+   ```
+
+2. Install Cert-Manager:
+   ```bash
+   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.3/cert-manager.yaml
+   kubectl wait --for=condition=available --timeout=300s deployment/cert-manager -n cert-manager
+   ```
+
+3. Install Rancher:
+   ```bash
+   helm install rancher rancher-latest/rancher \
+       --namespace cattle-system --create-namespace \
+       --set hostname=<RANCHER_HOSTNAME> \
+       --set replicas=2 \
+       --set bootstrapPassword=admin
+   ```
+   Replace `<RANCHER_HOSTNAME>` with a valid domain name pointing to your cluster.
+
+4. Verify Rancher installation:
+   ```bash
+   kubectl -n cattle-system rollout status deploy/rancher
+   ```
+
+5. Access Rancher:
+   - Open a browser and navigate to `https://<RANCHER_HOSTNAME>`.
+   - Log in with the default username `admin` and the password set during installation.
+
+---
+
+## **5. Optional: Set Up Persistent Storage**
+Install a CSI driver like Longhorn or NFS to provide persistent storage for workloads in your cluster.
+
+---
 
 Here's how you can set up **HAProxy** on a dedicated node to load balance traffic across your RKE2 master nodes:
 
@@ -186,115 +298,3 @@ Here's how you can set up **HAProxy** on a dedicated node to load balance traffi
 
 ---
 
-## **2. Install RKE2**
-### **On All Master Nodes**
-1. Install RKE2:
-   ```bash
-   curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=server sudo sh -
-   ```
-2. Enable RKE2 server:
-   ```bash
-   sudo systemctl enable rke2-server.service
-   ```
-3. Configure RKE2 for HA:
-   - sudo mkdir -p /etc/rancher/rke2
-   - sudo nano /etc/rancher/rke2/config.yaml
-   - Edit `/etc/rancher/rke2/config.yaml` on **master nodes**:
-     ```yaml
-     server: https://<LOAD_BALANCER_IP>:6443
-     token: "<CLUSTER_SECRET_TOKEN>"
-     tls-san:
-       - "<LOAD_BALANCER_IP>"
-     ```
-   - Replace `<LOAD_BALANCER_IP>` with your load balancer's IP and `<CLUSTER_SECRET_TOKEN>` with a strong, unique token.
-5. Start RKE2 server:
-   ```bash
-   sudo systemctl start rke2-server.service
-   ```
-6. View status
-   - sudo systemctl status rke2-server.service
-   - sudo journalctl -u rke2-server.service -f
-     
-### **On All Worker Nodes**
-1. Install RKE2:
-   ```bash
-   curl -sfL https://get.rke2.io | INSTALL_RKE2_TYPE=agent sh -
-   ```
-2. Enable RKE2 agent:
-   ```bash
-   sudo systemctl enable rke2-agent.service
-   ```
-3. Configure the worker nodes:
-   - sudo mkdir -p /etc/rancher/rke2
-   - sudo nano /etc/rancher/rke2/config.yaml
-   - Edit `/etc/rancher/rke2/config.yaml`:
-     ```yaml
-     server: https://<LOAD_BALANCER_IP>:6443
-     token: "<CLUSTER_SECRET_TOKEN>"
-     ```
-   - Use the same `<LOAD_BALANCER_IP>` and `<CLUSTER_SECRET_TOKEN>` as the master nodes.
-5. Start RKE2 agent:
-   ```bash
-   sudo systemctl start rke2-agent.service
-   ```
-6. View status
-   - sudo systemctl status rke2-agent.service
-   - sudo journalctl -u rke2-agent.service -f
----
-
-## **3. Verify Cluster Setup**
-1. On one master node, verify cluster status:
-   ```bash
-   sudo /var/lib/rancher/rke2/bin/kubectl get nodes
-   ```
-   Ensure all nodes are listed as `Ready`.
-
-2. Save the `kubeconfig` for local access:
-   ```bash
-   mkdir -p ~/.kube
-   sudo cp /etc/rancher/rke2/rke2.yaml ~/.kube/config
-   sudo chown $(id -u):$(id -g) ~/.kube/config
-   ```
-
----
-
-## **4. Install Rancher Server**
-1. Add the Helm repository:
-   ```bash
-   helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
-   helm repo update
-   ```
-
-2. Install Cert-Manager:
-   ```bash
-   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.3/cert-manager.yaml
-   kubectl wait --for=condition=available --timeout=300s deployment/cert-manager -n cert-manager
-   ```
-
-3. Install Rancher:
-   ```bash
-   helm install rancher rancher-latest/rancher \
-       --namespace cattle-system --create-namespace \
-       --set hostname=<RANCHER_HOSTNAME> \
-       --set replicas=2 \
-       --set bootstrapPassword=admin
-   ```
-   Replace `<RANCHER_HOSTNAME>` with a valid domain name pointing to your cluster.
-
-4. Verify Rancher installation:
-   ```bash
-   kubectl -n cattle-system rollout status deploy/rancher
-   ```
-
-5. Access Rancher:
-   - Open a browser and navigate to `https://<RANCHER_HOSTNAME>`.
-   - Log in with the default username `admin` and the password set during installation.
-
----
-
-## **5. Optional: Set Up Persistent Storage**
-Install a CSI driver like Longhorn or NFS to provide persistent storage for workloads in your cluster.
-
----
-
-Need further details on any of the steps?
