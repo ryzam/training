@@ -34,6 +34,104 @@ To set up a highly available (HA) RKE2 cluster with **3 master nodes** and **2 w
        server master1 <MASTER1_IP>:6443 check
        server master2 <MASTER2_IP>:6443 check
    ```
+
+Setting up **HAProxy** to load balance **Kubernetes RKE2 master nodes** is essential for a high-availability (HA) control plane. The goal is to ensure that API requests are distributed across multiple RKE2 server nodes.
+
+### **1. Install HAProxy**
+You need a dedicated load balancer node (or multiple if using multiple HAProxy instances). Install HAProxy on this node:
+
+```sh
+sudo apt update && sudo apt install -y haproxy
+```
+
+For **RHEL/CentOS**, use:
+
+```sh
+sudo yum install -y haproxy
+```
+
+---
+
+### **2. Configure HAProxy**
+Edit the HAProxy configuration file:
+
+```sh
+sudo nano /etc/haproxy/haproxy.cfg
+```
+
+#### **Example HAProxy Configuration for RKE2**
+```cfg
+global
+    log stdout format raw local0
+    maxconn 2000
+
+defaults
+    log global
+    mode tcp
+    retries 3
+    timeout connect 5s
+    timeout client 50s
+    timeout server 50s
+
+frontend rke2-api
+    bind *:6443
+    default_backend rke2-masters
+
+backend rke2-masters
+    balance roundrobin
+    option httpchk GET /healthz
+    http-check expect status 200
+    server master1 192.168.1.10:6443 check
+    server master2 192.168.1.11:6443 check
+    server master3 192.168.1.12:6443 check
+```
+
+#### **Explanation**
+- The **frontend `rke2-api`** listens on port **6443** (Kubernetes API).
+- The **backend `rke2-masters`** distributes traffic across multiple RKE2 master nodes.
+- **Health checks** ensure only healthy nodes receive traffic.
+
+---
+
+### **3. Enable and Restart HAProxy**
+Save and exit the file, then restart HAProxy:
+
+```sh
+sudo systemctl enable haproxy
+sudo systemctl restart haproxy
+sudo systemctl status haproxy
+```
+
+---
+
+### **4. Configure RKE2 Nodes to Use HAProxy**
+On each RKE2 master and agent node, configure it to use the HAProxy **VIP (Virtual IP)** instead of individual masters.
+
+Modify or create `/etc/rancher/rke2/config.yaml`:
+
+```yaml
+server: https://<haproxy-ip>:6443
+token: "<your-rke2-token>"
+```
+
+Restart RKE2:
+
+```sh
+sudo systemctl restart rke2-server
+```
+
+---
+
+### **5. Test the Setup**
+Check if HAProxy is forwarding requests:
+
+```sh
+kubectl get nodes --kubeconfig /etc/rancher/rke2/rke2.yaml
+```
+
+If you get the list of nodes, your HA setup is working!
+
+Let me know if you need extra tweaks, like integrating **Keepalived** for HAProxy redundancy! 🚀
 ---
 
 ## **2. Install RKE2**
