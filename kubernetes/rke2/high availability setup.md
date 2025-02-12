@@ -129,9 +129,6 @@ Check if HAProxy is forwarding requests:
 kubectl get nodes --kubeconfig /etc/rancher/rke2/rke2.yaml
 ```
 
-If you get the list of nodes, your HA setup is working!
-
-Let me know if you need extra tweaks, like integrating **Keepalived** for HAProxy redundancy! 🚀
 ---
 
 ## **2. Install RKE2**
