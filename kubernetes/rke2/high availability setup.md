@@ -129,6 +129,80 @@ Check if HAProxy is forwarding requests:
 kubectl get nodes --kubeconfig /etc/rancher/rke2/rke2.yaml
 ```
 
+## Troubleshot
+If both `/readyz` and `/healthz` return **"Unauthorized"**, it means the Kubernetes API server in RKE2 is enforcing authentication even for health checks. This is different from standard Kubernetes behavior, but RKE2 sometimes does this when certain configurations are enabled.
+
+### **1. Try Checking API Server Health with `kubectl` (On the Master Node)**
+Run this directly on an **RKE2 master node**:
+```sh
+kubectl get --raw='/healthz'
+```
+✅ If it returns `ok`, then the API is up and running. The issue is just that HAProxy’s health check is unauthenticated.
+
+---
+
+### **2. Fix HAProxy Health Check Using TCP Mode**
+Since RKE2’s API requires authentication, HAProxy's **HTTP health checks will fail**. Instead, we can switch to a simple **TCP check** to verify if the Kubernetes API server is responding.
+
+#### **Update HAProxy Configuration**
+Edit `/etc/haproxy/haproxy.cfg`:
+```cfg
+frontend rke2-api
+    bind *:6443
+    default_backend rke2-masters
+
+backend rke2-masters
+    balance roundrobin
+    option ssl-hello-chk
+    server master1 192.168.1.10:6443 check
+    server master2 192.168.1.11:6443 check
+    server master3 192.168.1.12:6443 check
+```
+
+#### **Why Use `option ssl-hello-chk`?**
+- This performs an **SSL handshake** instead of sending an HTTP request.
+- It works even when authentication is required because it only checks if the port is open.
+
+#### **Restart HAProxy**
+```sh
+sudo systemctl restart haproxy
+```
+
+---
+
+### **3. Verify HAProxy Connectivity to Masters**
+On the HAProxy node, check if it can connect to the RKE2 masters:
+
+```sh
+nc -vz 192.168.1.10 6443
+```
+✅ Expected output:
+```
+Connection to 192.168.1.10 6443 port [tcp/*] succeeded!
+```
+
+If this fails, check:
+- Firewall rules (`sudo ufw allow 6443/tcp` or `firewall-cmd --add-port=6443/tcp --permanent`)
+- If the API server is running (`sudo systemctl status rke2-server`)
+
+---
+
+### **4. Test HAProxy Logs**
+After restarting HAProxy, check if it's working:
+```sh
+sudo journalctl -u haproxy --no-pager | tail -n 50
+```
+If you no longer see **"no server available"**, the issue is resolved.
+
+---
+
+### **Summary**
+✔ Use **`option ssl-hello-chk`** in HAProxy to perform a TCP-level health check.  
+✔ Restart HAProxy and verify logs.  
+✔ Confirm connectivity using `nc -vz <master-ip> 6443`.  
+
+This should fix the **"Unauthorized"** issue while still ensuring that HAProxy properly load balances your RKE2 master nodes.
+
 ---
 
 ## **2. Install RKE2**
