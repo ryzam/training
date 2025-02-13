@@ -221,6 +221,15 @@ This should fix the **"Unauthorized"** issue while still ensuring that HAProxy p
    - sudo mkdir -p /etc/rancher/rke2
    - sudo nano /etc/rancher/rke2/config.yaml
    - Edit `/etc/rancher/rke2/config.yaml` on **master nodes**:
+     On the first master node
+     ```yaml
+     token: "<token>"
+     tls-san:
+      - server-mastername
+      - server-masterip
+     ```
+  
+     On the other master node
      ```yaml
      server: https://<LOAD_BALANCER_IP>:6443
      token: "<CLUSTER_SECRET_TOKEN>"
