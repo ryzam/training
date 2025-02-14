@@ -267,3 +267,90 @@ kubectl get nodes
 - **Worker nodes** use it to **join the cluster**.
 - Helps with **disabling unwanted components** (like Traefik).
 - Any changes require **restarting RKE2** to apply.
+
+---
+
+The differences between the **primary control plane configuration** and **additional control planes**, and also understand the role of **`tls-san`** in RKE2.
+
+---
+
+## 🔹 **Primary vs. Additional Control Plane Configurations**
+| **Feature**       | **Primary Control Plane** | **Additional Control Planes** |
+|------------------|------------------------|---------------------------|
+| **Config File**  | `/etc/rancher/rke2/config.yaml` | `/etc/rancher/rke2/config.yaml` |
+| **Defines Cluster Token?** | ✅ Yes | ❌ No (Just uses the token) |
+| **Sets `server:` field?** | ❌ No | ✅ Yes (Points to Load Balancer) |
+| **Uses `tls-san`?** | ✅ Yes (For LB & Custom DNS) | ❌ No (Uses API discovery) |
+| **Runs `rke2-server`?** | ✅ Yes | ✅ Yes |
+| **Runs etcd?** | ✅ Yes (etcd cluster initialized) | ✅ Yes (Joins etcd cluster) |
+
+---
+
+## 🔹 **Primary Control Plane (`config.yaml`)**
+The **first control plane node** is responsible for **bootstrapping the cluster** and **initializing etcd**.  
+It does **not** specify `server:` because it’s the one creating the cluster.
+
+```yaml
+token: "MySuperSecureToken"
+tls-san:
+  - "192.168.1.10"  # Load Balancer IP
+  - "rke2.example.com"  # Custom DNS for API access
+disable:
+  - rke2-ingress
+node-label:
+  - "node-role.kubernetes.io/control-plane=true"
+```
+### **Why No `server:` Field?**
+- The **first control plane node is the cluster itself** (it does not need to join another node).
+- Other control planes will join **this** node.
+
+### **Why Add `tls-san`?**
+- **TLS-SAN (Subject Alternative Name) is used for SSL certificates**.
+- By default, RKE2 **only issues a certificate for its real IP**.
+- When you add **a Load Balancer IP (`192.168.1.10`) or domain (`rke2.example.com`)**, the API server can accept requests from those sources **without TLS errors**.
+
+> 🛑 **Without `tls-san`, API requests through the Load Balancer would fail due to certificate mismatches!**  
+
+---
+
+## 🔹 **Additional Control Planes (`config.yaml`)**
+For the **second and third control plane nodes**, they **must join the cluster** through the **load balancer**.
+
+```yaml
+server: "https://192.168.1.10:6443"  # Load Balancer IP
+token: "MySuperSecureToken"
+disable:
+  - rke2-ingress
+```
+### **Why Do They Specify `server:`?**
+- They **must connect to an existing API server** to join the cluster.
+- The **Load Balancer distributes requests** to healthy control planes.
+
+### **Why No `tls-san`?**
+- `tls-san` is only needed on the **first node** to issue the correct API certificate.
+- These nodes **use the existing certificate from the primary control plane**.
+
+---
+
+## 🔹 **How `tls-san` Helps with High Availability**
+Imagine you **lose the first control plane node** (`192.168.1.11`).  
+- If all API requests were pointing **only** to `192.168.1.11`, **Kubernetes would break**.
+- Because we set `tls-san` to **`192.168.1.10` (Load Balancer)**, clients can still reach the cluster **through another control plane node**.
+
+---
+
+## ✅ **Final Summary**
+1. **Primary control plane:**
+   - **Bootstraps the cluster**.
+   - Does **not** have `server:` because it is the first node.
+   - Uses `tls-san` for **Load Balancer and Custom DNS**.
+
+2. **Additional control planes:**
+   - Must **join an existing cluster** (via `server: <LoadBalancerIP>`).
+   - Do **not** need `tls-san` because they use **existing certificates**.
+
+3. **`tls-san` is critical for high availability**:
+   - Ensures the API server **accepts connections from the Load Balancer**.
+   - Prevents TLS certificate mismatches when using **custom domain names**.
+
+Hope that clears things up! Let me know if you have more questions. 🚀
