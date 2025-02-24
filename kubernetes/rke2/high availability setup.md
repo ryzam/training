@@ -298,6 +298,14 @@ This should fix the **"Unauthorized"** issue while still ensuring that HAProxy p
    sudo chown $(id -u):$(id -g) ~/.kube/config
    ```
 
+3. Verify pods communication with internet. Create curlimages
+   ```bash
+   kubectl run test-curl --image=curlimages/curl --command -- sleep infinity
+   time kubectl exec -it test-curl -- curl -k https://reqres.in/api/users?page=1
+   ```
+   If there is a delay, check DNS setting and Canal network setting in config map.
+   
+
 ---
 
 ## **4. Install Rancher Server**
