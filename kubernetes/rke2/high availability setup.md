@@ -497,7 +497,6 @@ The delay is most likely due to **Flannel VXLAN overhead, MTU settings, or SNAT*
 ✅ **Check and optimize CoreDNS**  
 ✅ **Review Network Policies**  
 
-Try these and let me know if you need more help!
 ---
 
 ## **4. Install Rancher Server**
