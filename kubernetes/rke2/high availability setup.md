@@ -302,6 +302,9 @@ This should fix the **"Unauthorized"** issue while still ensuring that HAProxy p
    ```bash
    kubectl run test-curl --image=curlimages/curl --command -- sleep infinity
    time kubectl exec -it test-curl -- curl -k https://reqres.in/api/users?page=1
+
+   kubectl exec -it test-curl -- /bin/sh
+   nslookup kubernetes.default.svc.cluster.local
    ```
    If there is a delay, check DNS setting and Canal network setting in config map.
    
