@@ -305,7 +305,199 @@ This should fix the **"Unauthorized"** issue while still ensuring that HAProxy p
    ```
    If there is a delay, check DNS setting and Canal network setting in config map.
    
+If you can't resolve `kubernetes.default.svc.cluster.local` inside a pod, it’s likely a DNS issue. Here are some steps to troubleshoot and fix it:
 
+### 1. **Check if DNS is Working Inside the Pod**
+Run the following inside your pod:
+```sh
+nslookup google.com
+```
+If this fails, the pod might not have DNS configured properly.
+
+### 2. **Verify CoreDNS is Running**
+Check if the CoreDNS pods are running:
+```sh
+kubectl get pods -n kube-system | grep coredns
+```
+If they’re not running, try restarting them:
+```sh
+kubectl rollout restart deployment coredns -n kube-system
+```
+
+### 3. **Check the DNS Configuration of the Pod**
+Run:
+```sh
+cat /etc/resolv.conf
+```
+It should contain something like:
+```
+nameserver 10.43.0.10  # (Example IP, may vary)
+search default.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5
+```
+If the nameserver IP is missing or incorrect, check your cluster DNS settings.
+
+### 4. **Manually Test DNS Resolution**
+Try using `dig` or `nslookup` with the CoreDNS service directly:
+```sh
+nslookup kubernetes.default.svc.cluster.local 10.43.0.10
+```
+Replace `10.43.0.10` with your actual cluster DNS service IP from `/etc/resolv.conf`.
+
+### 5. **Ensure the Kubernetes Service Exists**
+Run:
+```sh
+kubectl get svc kubernetes -n default
+```
+If the service is missing, something is wrong with your cluster setup.
+
+### 6. **Check Network Policies or Firewalls**
+If your cluster has network policies enabled, check if they are blocking DNS traffic:
+```sh
+kubectl get networkpolicy --all-namespaces
+```
+Also, check if `iptables` or firewall rules are blocking UDP traffic on port 53.
+
+### 7. **Restart Your Pod**
+Sometimes, simply restarting the pod can resolve DNS issues:
+```sh
+kubectl delete pod <your-pod-name>
+```
+Let Kubernetes recreate it.
+
+Yes, **RKE2** uses **Canal** as the default CNI, which is a combination of **Flannel** (for networking) and **Calico** (for network policies). Since you're experiencing delays in **internet access from pods** compared to nodes, the issue is likely due to **VXLAN encapsulation**, **NAT overhead**, or **MTU settings** in Canal.
+
+---
+
+## 🔍 **Troubleshooting & Solutions**
+
+### 1️⃣ **Check if Flannel VXLAN is Slowing Down Traffic**
+By default, **Flannel in Canal uses VXLAN**, which encapsulates traffic and can cause latency. You can check the Flannel settings with:
+```sh
+kubectl get cm -n kube-system canal-config -o yaml
+```
+Look for:
+```yaml
+data:
+  net-conf.json: |
+    {
+      "Network": "10.42.0.0/16",
+      "Backend": {
+        "Type": "vxlan"
+      }
+    }
+```
+
+✅ **Fix:**  
+Try switching to **host-gw** mode (if nodes are in the same L2 network) for better performance:
+```yaml
+"Backend": {
+  "Type": "host-gw"
+}
+```
+Apply the change and restart the network:
+```sh
+kubectl delete pod -n kube-system -l k8s-app=canal
+```
+
+---
+
+### 2️⃣ **Check MTU Mismatch Issues**
+If Flannel is using VXLAN, the **MTU size is lower** due to encapsulation. The default MTU for VXLAN is usually **1450** instead of **1500**.
+
+Run this on a node:
+```sh
+ip link show flannel.1
+```
+You’ll see something like:
+```
+flannel.1: mtu 1450 qdisc noqueue state UNKNOWN mode DEFAULT group default
+```
+
+✅ **Fix:**  
+Adjust MTU to match your environment by modifying the **Canal ConfigMap**:
+```sh
+kubectl edit cm canal-config -n kube-system
+```
+Find `FELIX_IPINIPMTU` and set it:
+```yaml
+data:
+  "FELIX_IPINIPMTU": "1440"
+```
+Then restart Canal:
+```sh
+kubectl delete pod -n kube-system -l k8s-app=canal
+```
+
+---
+
+### 3️⃣ **Check if Pod Traffic is NATed (Masquerade)**
+By default, **Canal uses SNAT**, meaning pod traffic gets NATed when leaving the cluster, which adds latency.
+
+Check if SNAT is applied:
+```sh
+iptables -t nat -L -n -v | grep MASQUERADE
+```
+
+✅ **Fix:**  
+Disable SNAT by adding this to `canal-config`:
+```yaml
+"FELIX_MASQUERADE": "false"
+```
+Then restart Canal.
+
+💡 **Alternative:** If you need SNAT but want better performance, consider using **IPVS** mode for kube-proxy.
+
+---
+
+### 4️⃣ **Check CoreDNS Latency**
+If DNS resolution is slow, it can make external requests feel delayed.
+
+Test inside a pod:
+```sh
+time nslookup google.com
+```
+If it’s slow, restart CoreDNS:
+```sh
+kubectl rollout restart deployment coredns -n kube-system
+```
+
+✅ **Fix:**  
+Check the CoreDNS ConfigMap:
+```sh
+kubectl edit cm coredns -n kube-system
+```
+Try adding a caching rule:
+```yaml
+cache 30
+```
+
+---
+
+### 5️⃣ **Check Network Policies**
+Canal uses **Calico for network policies**, and some policies may **restrict or delay outbound traffic**.
+
+Check for policies:
+```sh
+kubectl get networkpolicy -A
+```
+If you find restrictive policies, edit or delete them:
+```sh
+kubectl delete networkpolicy <policy-name> -n <namespace>
+```
+
+---
+
+### 🚀 **Conclusion**
+The delay is most likely due to **Flannel VXLAN overhead, MTU settings, or SNAT**. Here’s what you should do:
+
+✅ **Switch to host-gw mode (if possible)**  
+✅ **Optimize MTU settings**  
+✅ **Disable SNAT or use IPVS mode**  
+✅ **Check and optimize CoreDNS**  
+✅ **Review Network Policies**  
+
+Try these and let me know if you need more help!
 ---
 
 ## **4. Install Rancher Server**
