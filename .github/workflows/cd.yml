@@ -3,7 +3,7 @@ name: CD
 on:
   push:
     branches:
-      - master
+      - main
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKER_USERNAME }}
