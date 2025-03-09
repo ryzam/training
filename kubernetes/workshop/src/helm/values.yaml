@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 env:
-  APP_VERSION: 5977cddbac8264a1db6ae6efd8f710c82d243e32
+  APP_VERSION: 1743820bba6fb992a409574c37e25a0acd75e3fa
 
 # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
 replicaCount: 1
