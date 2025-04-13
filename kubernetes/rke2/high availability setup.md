@@ -505,6 +505,7 @@ The delay is most likely due to **Flannel VXLAN overhead, MTU settings, or SNAT*
 ## **4. Install Rancher Server**
 1. Add the Helm repository:
    ```bash
+   chmod 600 /root/.kube/config
    helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
    helm repo update
    ```
